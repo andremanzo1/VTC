@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlite3
 from datetime import datetime
-
+import calendar
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Required for flashing messages
 
@@ -50,9 +50,30 @@ def index():
     c.execute("SELECT * FROM static_overhead WHERE month=?", (month,))
     static_overhead = c.fetchall()
 
+    # Calculate total income
+    total_income = sum(program[5] for program in programs) + sum(income[2] for income in static_income)
+
+    # Calculate total expenses
+    total_expenses = sum(overhead[2] for overhead in static_overhead)
+
+    # Calculate profit/loss
+    profit_loss = total_income - total_expenses
+
+    # Calculate the number of days in the selected month
+    year, month_num = map(int, month.split('-'))
+    _, num_days_in_month = calendar.monthrange(year, month_num)  # Get the number of days in the month
+
+    # Break-even analysis for each program
+    program_break_even = []
+    for program in programs:
+        program_id, program_name, daily_rate, billed_residents, average_occupancy, total_daily_income, program_month = program
+        if daily_rate > 0:
+            break_even_beds = total_expenses / (daily_rate * num_days_in_month)  # Use the correct number of days
+            program_break_even.append((program_name, break_even_beds))
+
     conn.close()
 
-    return render_template('index.html', programs=programs, static_income=static_income, static_overhead=static_overhead, selected_month=month)
+    return render_template('index.html', programs=programs, static_income=static_income, static_overhead=static_overhead, selected_month=month, total_income=total_income, total_expenses=total_expenses, profit_loss=profit_loss, program_break_even=program_break_even)
 
 @app.route('/add_program', methods=['POST'])
 def add_program():
